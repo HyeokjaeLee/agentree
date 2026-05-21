@@ -318,7 +318,26 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   removeTerminal: (projectId, parentId, parentType, terminalId) => {
     set((s) => {
-      const newActive = s.activeTerminalId === terminalId ? null : s.activeTerminalId;
+      let newActive = s.activeTerminalId;
+      if (s.activeTerminalId === terminalId) {
+        const proj = s.projects.find((p) => p.id === projectId);
+        if (proj) {
+          const parent = parentType === "worktree"
+            ? proj.worktrees.find((w) => w.id === parentId)
+            : proj.branches.find((b) => b.id === parentId);
+          if (parent) {
+            const siblings = ((parent as any).terminals ?? []) as Terminal[];
+            const idx = siblings.findIndex((t) => t.id === terminalId);
+            const remaining = siblings.filter((t) => t.id !== terminalId);
+            if (remaining.length > 0) {
+              const fallback = remaining[Math.min(idx, remaining.length - 1)];
+              if (fallback) newActive = fallback.id;
+            } else {
+              newActive = null;
+            }
+          }
+        }
+      }
       return {
         projects: s.projects.map((p) =>
           p.id === projectId

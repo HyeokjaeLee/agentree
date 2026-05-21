@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useProjectStore } from "@/stores/useProjectStore";
-import { usePty, useXterm, killPtySession, hasPtySession } from "@/hooks/usePty";
+import { usePty, useXterm, hasPtySession } from "@/hooks/usePty";
 import { useGhosttyTheme } from "@/hooks/useGhosttyTheme";
 import { cn } from "@/lib/utils";
-import { X, Plus } from "lucide-react";
+import { X, Plus, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import type { Branch, Worktree, Terminal as TerminalType } from "@/types/project";
 
 function TerminalTab({
@@ -28,6 +27,7 @@ function TerminalTab({
   onCancelEdit: () => void;
 }) {
   const [draft, setDraft] = useState(terminal.name);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const committedRef = useRef(false);
 
   useEffect(() => {
@@ -48,20 +48,27 @@ function TerminalTab({
     }
   }, [draft, terminal.name, onCommitEdit, onCancelEdit]);
 
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY });
+  }, []);
+
   if (isEditing) {
     return (
       <div
         className={cn(
-          "flex items-center gap-1.5 px-3 py-1.5 text-xs border-r border-border cursor-pointer group min-w-0",
+          "flex items-center gap-1.5 px-3 py-1.5 text-xs border-r border-border cursor-pointer group",
+          "max-w-[180px] min-w-[80px]",
           isActive
             ? "bg-background text-foreground border-b-2 border-b-primary"
-            : "bg-muted/50 text-muted-foreground hover:bg-accent/50"
+            : "bg-muted/50 text-muted-foreground"
         )}
         onClick={onClick}
       >
         <input
           autoFocus
-          className="bg-transparent text-foreground outline-none border-b border-primary w-full min-w-[60px]"
+          className="bg-transparent text-foreground outline-none border-b border-primary w-full"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
@@ -75,17 +82,6 @@ function TerminalTab({
           onBlur={commit}
           onClick={(e) => e.stopPropagation()}
         />
-        {terminal.label && terminal.label !== terminal.name && (
-          <Badge variant="secondary" className="h-4 px-1 text-[9px]">
-            {terminal.label}
-          </Badge>
-        )}
-        <button
-          onClick={(e) => { e.stopPropagation(); onClose(); }}
-          className="opacity-0 group-hover:opacity-100 transition-opacity ml-1"
-        >
-          <X className="h-3 w-3" />
-        </button>
       </div>
     );
   }
@@ -93,27 +89,52 @@ function TerminalTab({
   return (
     <div
       className={cn(
-        "flex items-center gap-1.5 px-3 py-1.5 text-xs border-r border-border cursor-pointer group min-w-0",
+        "relative flex items-center gap-1.5 px-3 py-1.5 text-xs border-r border-border cursor-pointer group",
+        "max-w-[180px] min-w-[80px] shrink-0",
         isActive
           ? "bg-background text-foreground border-b-2 border-b-primary"
           : "bg-muted/50 text-muted-foreground hover:bg-accent/50"
       )}
       onClick={onClick}
+      onContextMenu={handleContextMenu}
     >
-      <span className="truncate" onDoubleClick={onStartEdit}>
+      <span className="truncate flex-1 min-w-0">
         {terminal.name}
       </span>
-      {terminal.label && terminal.label !== terminal.name && (
-        <Badge variant="secondary" className="h-4 px-1 text-[9px]">
-          {terminal.label}
-        </Badge>
-      )}
       <button
         onClick={(e) => { e.stopPropagation(); onClose(); }}
-        className="opacity-0 group-hover:opacity-100 transition-opacity ml-1"
+        className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
       >
         <X className="h-3 w-3" />
       </button>
+      {contextMenu && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setContextMenu(null)}
+            onContextMenu={(e) => { e.preventDefault(); setContextMenu(null); }}
+          />
+          <div
+            className="fixed z-50 w-32 rounded-md border border-border bg-popover shadow-md py-1"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+          >
+            <button
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-foreground hover:bg-accent"
+              onClick={(e) => { e.stopPropagation(); setContextMenu(null); onStartEdit(); }}
+            >
+              <Pencil className="h-3 w-3" />
+              Rename
+            </button>
+            <button
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-destructive hover:bg-accent"
+              onClick={(e) => { e.stopPropagation(); setContextMenu(null); onClose(); }}
+            >
+              <X className="h-3 w-3" />
+              Close
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -124,10 +145,9 @@ function TerminalCanvas({ terminal, cwd, visible }: { terminal: TerminalType; cw
   const { spawnPty } = usePty(terminal.id, { cwd });
 
   useEffect(() => {
-    if (xtermRef.current && !hasPtySession(terminal.id)) {
-      const term = xtermRef.current;
-      spawnPty(term, term.cols, term.rows);
-    }
+    const term = xtermRef.current;
+    if (!term || hasPtySession(terminal.id)) return;
+    spawnPty(term, term.cols, term.rows);
   }, [xtermRef.current, terminal.id, spawnPty]);
 
   useEffect(() => {
@@ -140,8 +160,8 @@ function TerminalCanvas({ terminal, cwd, visible }: { terminal: TerminalType; cw
   return (
     <div
       ref={containerRef}
-      className="h-full w-full bg-background"
-      style={{ display: visible ? "block" : "none" }}
+      className="absolute inset-0 bg-background"
+      style={{ visibility: visible ? "visible" : "hidden" }}
     />
   );
 }
@@ -183,6 +203,21 @@ export function TerminalView() {
     ? allTerminals.filter((t) => t.parentId === activeWorktree.id)
     : [];
 
+  const handleClose = useCallback(
+    (projectId: string, parentId: string, parentType: "branch" | "worktree", terminalId: string) => {
+      removeTerminal(projectId, parentId, parentType, terminalId);
+    },
+    [removeTerminal]
+  );
+
+  const handleCommitEdit = useCallback(
+    (terminalId: string, newName: string) => {
+      renameTerminal(terminalId, newName);
+      setEditingTerminalId(null);
+    },
+    [renameTerminal]
+  );
+
   if (!activeWorktree) {
     return (
       <div className="flex h-full items-center justify-center text-muted-foreground">
@@ -203,7 +238,7 @@ export function TerminalView() {
             variant="outline"
             size="sm"
             className="mt-2"
-            onClick={() => addTerminal(terminalParent!.projectId, activeWorktree.id, "worktree")}
+            onClick={() => addTerminal(terminalParent?.projectId ?? "", activeWorktree.id, "worktree")}
           >
             <Plus className="h-3.5 w-3.5 mr-1" /> Open Terminal
           </Button>
@@ -214,7 +249,7 @@ export function TerminalView() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center border-b border-border bg-muted/30 overflow-x-auto">
+      <div className="flex items-center border-b border-border bg-muted/30 overflow-x-auto shrink-0">
         {visibleTerminals.map(({ terminal, projectId, parentId, parentType }) => (
           <TerminalTab
             key={terminal.id}
@@ -222,15 +257,9 @@ export function TerminalView() {
             isActive={terminal.id === activeTerminalId}
             isEditing={terminal.id === editingTerminalId}
             onClick={() => setActiveTerminal(terminal.id)}
-            onClose={() => {
-              killPtySession(terminal.id);
-              removeTerminal(projectId, parentId, parentType, terminal.id);
-            }}
+            onClose={() => handleClose(projectId, parentId, parentType, terminal.id)}
             onStartEdit={() => setEditingTerminalId(terminal.id)}
-            onCommitEdit={(newName) => {
-              renameTerminal(terminal.id, newName);
-              setEditingTerminalId(null);
-            }}
+            onCommitEdit={(newName) => handleCommitEdit(terminal.id, newName)}
             onCancelEdit={() => setEditingTerminalId(null)}
           />
         ))}

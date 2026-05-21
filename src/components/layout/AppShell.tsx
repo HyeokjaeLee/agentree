@@ -1,11 +1,6 @@
 import { useEffect, useCallback, useRef } from "react";
 import { Sidebar } from "@/components/sidebar/Sidebar";
 import { TerminalView } from "@/components/terminal/TerminalView";
-import {
-  AddProjectDialog,
-  NewBranchDialog,
-  NewWorktreeDialog,
-} from "@/components/dialogs/Dialogs";
 import { useProjectStore } from "@/stores/useProjectStore";
 import { useNotificationStore } from "@/stores/useNotificationStore";
 import { useUIStore } from "@/stores/useUIStore";
@@ -79,9 +74,6 @@ export function AppShell() {
       <div className="flex-1 min-w-0 flex flex-col">
         <TerminalView />
       </div>
-      <AddProjectDialog />
-      <NewBranchDialog />
-      <NewWorktreeDialog />
     </div>
   );
 }

@@ -51,9 +51,82 @@ export function usePty(terminalId: string, { cwd, onExit }: UsePtyOptions) {
 
         pty.onData((data: Uint8Array) => term.write(new Uint8Array(data)));
 
+        // ── WKWebView (Tauri macOS) Korean IME fix ──
+        // Requires _keyDownSeen patch on @xterm/xterm (see patches/@xterm+xterm+5.5.0.patch).
+        //
+        // Strategy: let xterm.js handle insertText naturally (sends to PTY via _inputEvent).
+        // Only intercept insertReplacementText — which xterm.js ignores — by sending
+        // backspace+new-char to PTY. This gives real-time composition display with zero delay.
+        //
+        // 1. Block keydown 229 → _keyDownSeen stays false → _inputEvent processes insertText
+        // 2. Block keypress after keydown 229 → prevent double-send via keypress path
+        // 3. insertReplacementText with Hangul → pty.write(VERASE + data) for instant update
+        const imeCleanupFns: (() => void)[] = [];
+
+        const isHangul = (text: string): boolean => {
+          if (!text) return false;
+          for (const ch of text) {
+            const cp = ch.codePointAt(0)!;
+            if (
+              (cp >= 0x1100 && cp <= 0x11FF) ||
+              (cp >= 0x3130 && cp <= 0x318F) ||
+              (cp >= 0xAC00 && cp <= 0xD7AF)
+            ) return true;
+          }
+          return false;
+        };
+
+        let lastKeydownWas229 = false;
+        let lastReplacement = '';
+
+        term.attachCustomKeyEventHandler((event: KeyboardEvent) => {
+          if (event.type === 'keydown') {
+            if (event.keyCode === 229) {
+              lastKeydownWas229 = true;
+              return false;
+            }
+            lastKeydownWas229 = false;
+          }
+          if (event.type === 'keypress' && lastKeydownWas229) {
+            return false;
+          }
+          return true;
+        });
+
+        const xtermEl = term.element;
+        if (xtermEl) {
+          const onInput = (ev: Event) => {
+            const e = ev as InputEvent;
+
+            if (e.inputType !== 'insertReplacementText') {
+              lastReplacement = '';
+              return;
+            }
+
+            if (!e.data || !isHangul(e.data)) return;
+
+            if (e.data === lastReplacement) {
+              e.stopImmediatePropagation();
+              e.preventDefault();
+              return;
+            }
+
+            lastReplacement = e.data;
+            e.stopImmediatePropagation();
+            e.preventDefault();
+            pty.write(`\x7f${e.data}`);
+          };
+
+          xtermEl.addEventListener('input', onInput, true);
+
+          imeCleanupFns.push(() => {
+            xtermEl.removeEventListener('input', onInput, true);
+          });
+        }
+
         pty.onExit(({ exitCode }: { exitCode: number }) => {
-          term.write(`\r\n\x1b[90m[Process exited: ${exitCode}]\x1b[0m`);
           PTY_SESSIONS.delete(terminalId);
+          try { term.write(`\r\n\x1b[90m[Process exited: ${exitCode}]\x1b[0m`); } catch {}
           onExit?.(exitCode);
         });
 
@@ -61,7 +134,7 @@ export function usePty(terminalId: string, { cwd, onExit }: UsePtyOptions) {
           write: (data: string) => pty.write(data),
           resize: (c: number, r: number) => pty.resize(c, r),
           kill: () => pty.kill(),
-          disposables: [dataDisp, resizeDisp],
+          disposables: [dataDisp, resizeDisp, ...imeCleanupFns.map(fn => ({ dispose: fn }))],
         });
       } catch (e) {
         term.write(`\r\n\x1b[31mFailed to spawn shell: ${e}\x1b[0m`);
@@ -72,7 +145,8 @@ export function usePty(terminalId: string, { cwd, onExit }: UsePtyOptions) {
 
   useEffect(() => {
     return () => {
-      killPtySession(terminalId);
+      const id = terminalId;
+      setTimeout(() => killPtySession(id), 300);
     };
   }, [terminalId]);
 
