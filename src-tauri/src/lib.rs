@@ -16,6 +16,7 @@ pub fn run() {
             commands::branch::create_branch,
             commands::branch::delete_branch,
             commands::branch::list_branches,
+            commands::branch::fetch_remote_branches,
             commands::branch::switch_branch,
             commands::worktree::create_worktree,
             commands::worktree::remove_worktree,

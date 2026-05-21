@@ -36,7 +36,6 @@ pub fn delete_branch(repo_path: &Path, name: &str) -> Result<(), String> {
 
 pub struct WorktreeInfo {
     pub path: String,
-    pub commit: String,
     pub branch: Option<String>,
 }
 
@@ -44,25 +43,20 @@ pub fn list_worktrees(repo_path: &Path) -> Result<Vec<WorktreeInfo>, String> {
     let output = git_cmd(repo_path, &["worktree", "list", "--porcelain"])?;
     let mut worktrees = Vec::new();
     let mut current_path = String::new();
-    let mut current_commit = String::new();
     let mut current_branch: Option<String> = None;
 
     for line in output.lines() {
         if line.starts_with("worktree ") {
             current_path = line.trim_start_matches("worktree ").to_string();
-        } else if line.starts_with("HEAD ") {
-            current_commit = line.trim_start_matches("HEAD ").to_string();
         } else if line.starts_with("branch ") {
             let branch = line.trim_start_matches("branch refs/heads/").to_string();
             current_branch = Some(branch);
         } else if line.is_empty() && !current_path.is_empty() {
             worktrees.push(WorktreeInfo {
                 path: current_path.clone(),
-                commit: current_commit.clone(),
                 branch: current_branch.clone(),
             });
             current_path.clear();
-            current_commit.clear();
             current_branch = None;
         }
     }
@@ -70,7 +64,6 @@ pub fn list_worktrees(repo_path: &Path) -> Result<Vec<WorktreeInfo>, String> {
     if !current_path.is_empty() {
         worktrees.push(WorktreeInfo {
             path: current_path,
-            commit: current_commit,
             branch: current_branch,
         });
     }
@@ -108,6 +101,23 @@ pub fn is_dirty(repo_path: &Path) -> bool {
     git_cmd(repo_path, &["status", "--porcelain"])
         .map(|out| !out.is_empty())
         .unwrap_or(false)
+}
+
+pub fn fetch_all(repo_path: &Path) -> Result<(), String> {
+    git_cmd(repo_path, &["fetch", "--all", "--prune"])?;
+    Ok(())
+}
+
+pub fn list_remote_branches(repo_path: &Path) -> Result<Vec<String>, String> {
+    let output = git_cmd(repo_path, &["branch", "-r", "--format=%(refname:short)"])?;
+    if output.is_empty() {
+        return Ok(vec![]);
+    }
+    Ok(output
+        .lines()
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.ends_with("/HEAD"))
+        .collect())
 }
 
 #[cfg(test)]

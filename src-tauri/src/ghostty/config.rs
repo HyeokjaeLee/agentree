@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GhosttyConfig {
@@ -145,7 +145,10 @@ impl GhosttyConfig {
         theme.insert("foreground".into(), self.foreground.clone());
         theme.insert("cursor".into(), self.foreground.clone());
         theme.insert("cursorAccent".into(), self.background.clone());
-        theme.insert("selectionBackground".into(), format!("{}40", self.foreground));
+        theme.insert(
+            "selectionBackground".into(),
+            format!("{}40", self.foreground),
+        );
         for (key, value) in &self.palette {
             theme.insert(key.clone(), value.clone());
         }

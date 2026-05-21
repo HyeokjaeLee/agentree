@@ -1,7 +1,18 @@
-import { create } from "zustand";
 import { v4 as uuid } from "uuid";
-import type { Project, Branch, Worktree, Terminal } from "@/types/project";
-import * as api from "@/lib/invoke";
+import { create } from "zustand";
+import {
+  addProject,
+  createBranch,
+  createWorktree,
+  deleteBranch,
+  loadAppState,
+  refreshProject,
+  removeWorktree,
+  saveAppState,
+  setLabel,
+  switchBranch,
+} from "@/lib/invoke";
+import type { Branch, Project, Terminal, Worktree } from "@/types/project";
 
 interface ProjectState {
   projects: Project[];
@@ -23,14 +34,23 @@ interface ProjectState {
   renameTerminal: (terminalId: string, newName: string) => void;
 
   addTerminal: (projectId: string, parentId: string, parentType: "branch" | "worktree") => string;
-  removeTerminal: (projectId: string, parentId: string, parentType: "branch" | "worktree", terminalId: string) => void;
+  removeTerminal: (
+    projectId: string,
+    parentId: string,
+    parentType: "branch" | "worktree",
+    terminalId: string,
+  ) => void;
   setActiveTerminal: (terminalId: string | null) => void;
 
   setLabel: (entityType: string, entityId: string, label: string) => Promise<void>;
 
   getActiveTerminal: () => Terminal | null;
   getActiveWorktree: () => Worktree | null;
-  getActiveTerminalParent: () => { projectId: string; parentId: string; parentType: "branch" | "worktree" } | null;
+  getActiveTerminalParent: () => {
+    projectId: string;
+    parentId: string;
+    parentType: "branch" | "worktree";
+  } | null;
   getProjectById: (id: string) => Project | undefined;
 }
 
@@ -42,13 +62,13 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   loadFromStorage: async () => {
     set({ loading: true });
     try {
-      const projects = await api.loadAppState();
+      const projects = await loadAppState();
       const migrateTerminal = (t: unknown): Terminal => {
         const rec = t as Record<string, unknown>;
         return {
           ...(t as Terminal),
           parent_id: ((rec.parent_id ?? rec.worktree_id) as string) || "",
-          parent_type: ((rec.parent_type ?? "worktree") as "branch" | "worktree"),
+          parent_type: (rec.parent_type ?? "worktree") as "branch" | "worktree",
         };
       };
       const hydrated = projects.map((p) => ({
@@ -78,15 +98,18 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   saveToStorage: async () => {
     try {
-      await api.saveAppState(get().projects);
-    } catch (e) {
-      console.error("Failed to save state:", e);
-    }
+      await saveAppState(get().projects);
+    } catch {}
   },
 
   addProject: async (path, label) => {
     const project = await api.addProject(path, label);
-    project.branches = project.branches.map((b) => ({ ...b, project_id: project.id, terminals: [] }));
+    project.branches = project.branches.map((b) => ({
+      ...b,
+      project_id: project.id,
+      terminals: [],
+    }));
+    project.remote_branches = project.remote_branches ?? [];
     project.worktrees = project.worktrees.map((w) => ({
       ...w,
       project_id: project.id,
@@ -103,7 +126,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   refreshProject: async (id) => {
     const proj = get().projects.find((p) => p.id === id);
-    if (!proj) return;
+    if (!proj) {
+      return;
+    }
     const updated = await api.refreshProject(proj);
     updated.id = id;
     updated.branches = updated.branches.map((b) => {
@@ -126,6 +151,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         label: existing?.label ?? w.label,
       };
     });
+    updated.remote_branches = updated.remote_branches ?? [];
     set((s) => ({
       projects: s.projects.map((p) => (p.id === id ? updated : p)),
     }));
@@ -134,13 +160,15 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   createBranch: async (projectId, name) => {
     const proj = get().projects.find((p) => p.id === projectId);
-    if (!proj) return;
+    if (!proj) {
+      return;
+    }
     const branch = await api.createBranch(proj.path, name);
     branch.project_id = projectId;
     (branch as Branch & { terminals: Terminal[] }).terminals = [];
     set((s) => ({
       projects: s.projects.map((p) =>
-        p.id === projectId ? { ...p, branches: [...p.branches, branch] } : p
+        p.id === projectId ? { ...p, branches: [...p.branches, branch] } : p,
       ),
     }));
     get().saveToStorage();
@@ -148,13 +176,13 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   deleteBranch: async (projectId, name) => {
     const proj = get().projects.find((p) => p.id === projectId);
-    if (!proj) return;
+    if (!proj) {
+      return;
+    }
     await api.deleteBranch(proj.path, name);
     set((s) => ({
       projects: s.projects.map((p) =>
-        p.id === projectId
-          ? { ...p, branches: p.branches.filter((b) => b.name !== name) }
-          : p
+        p.id === projectId ? { ...p, branches: p.branches.filter((b) => b.name !== name) } : p,
       ),
     }));
     get().saveToStorage();
@@ -162,8 +190,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   createWorktree: async (projectId, branch, label) => {
     const proj = get().projects.find((p) => p.id === projectId);
-    if (!proj) return;
-    const autoLabel = label || `${branch.replace(/\//g, "-")}-agentree-${proj.worktrees.length + 1}`;
+    if (!proj) {
+      return;
+    }
+    const autoLabel =
+      label || `${branch.replace(/\//gu, "-")}-agentree-${proj.worktrees.length + 1}`;
     const tempId = `temp-${Date.now()}`;
     const placeholder: Worktree = {
       id: tempId,
@@ -176,7 +207,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     };
     set((s) => ({
       projects: s.projects.map((p) =>
-        p.id === projectId ? { ...p, worktrees: [...p.worktrees, placeholder] } : p
+        p.id === projectId ? { ...p, worktrees: [...p.worktrees, placeholder] } : p,
       ),
     }));
     try {
@@ -187,16 +218,14 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         projects: s.projects.map((p) =>
           p.id === projectId
             ? { ...p, worktrees: p.worktrees.map((w) => (w.id === tempId ? worktree : w)) }
-            : p
+            : p,
         ),
       }));
       get().saveToStorage();
     } catch (e) {
       set((s) => ({
         projects: s.projects.map((p) =>
-          p.id === projectId
-            ? { ...p, worktrees: p.worktrees.filter((w) => w.id !== tempId) }
-            : p
+          p.id === projectId ? { ...p, worktrees: p.worktrees.filter((w) => w.id !== tempId) } : p,
         ),
       }));
       throw e;
@@ -205,15 +234,19 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   removeWorktree: async (projectId, worktreeId) => {
     const proj = get().projects.find((p) => p.id === projectId);
-    if (!proj) return;
+    if (!proj) {
+      return;
+    }
     const wt = proj.worktrees.find((w) => w.id === worktreeId);
-    if (!wt) return;
+    if (!wt) {
+      return;
+    }
     await api.removeWorktree(proj.path, wt.path);
     set((s) => ({
       projects: s.projects.map((p) =>
         p.id === projectId
           ? { ...p, worktrees: p.worktrees.filter((w) => w.id !== worktreeId) }
-          : p
+          : p,
       ),
     }));
     get().saveToStorage();
@@ -221,7 +254,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   switchBranch: async (projectId, branch, worktreePath) => {
     const proj = get().projects.find((p) => p.id === projectId);
-    if (!proj) return;
+    if (!proj) {
+      return;
+    }
     await api.switchBranch(proj.path, branch, worktreePath);
     await get().refreshProject(projectId);
   },
@@ -232,15 +267,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         ...p,
         branches: p.branches.map((b) => ({
           ...b,
-          terminals: b.terminals.map((t) =>
-            t.id === terminalId ? { ...t, name: newName } : t
-          ),
+          terminals: b.terminals.map((t) => (t.id === terminalId ? { ...t, name: newName } : t)),
         })),
         worktrees: p.worktrees.map((w) => ({
           ...w,
-          terminals: w.terminals.map((t) =>
-            t.id === terminalId ? { ...t, name: newName } : t
-          ),
+          terminals: w.terminals.map((t) => (t.id === terminalId ? { ...t, name: newName } : t)),
         })),
       }));
       return { projects };
@@ -251,7 +282,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   addTerminal: (projectId, parentId, parentType) => {
     const id = uuid();
     const proj = get().projects.find((p) => p.id === projectId);
-    if (!proj) return id;
+    if (!proj) {
+      return id;
+    }
 
     let terminalCount = 0;
     if (parentType === "worktree") {
@@ -290,7 +323,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
                               terminal,
                             ],
                           }
-                        : w
+                        : w,
                     )
                   : p.worktrees,
               branches:
@@ -304,11 +337,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
                               terminal,
                             ],
                           }
-                        : b
+                        : b,
                     )
                   : p.branches,
             }
-          : p
+          : p,
       ),
       activeTerminalId: id,
     }));
@@ -322,16 +355,19 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       if (s.activeTerminalId === terminalId) {
         const proj = s.projects.find((p) => p.id === projectId);
         if (proj) {
-          const parent = parentType === "worktree"
-            ? proj.worktrees.find((w) => w.id === parentId)
-            : proj.branches.find((b) => b.id === parentId);
+          const parent =
+            parentType === "worktree"
+              ? proj.worktrees.find((w) => w.id === parentId)
+              : proj.branches.find((b) => b.id === parentId);
           if (parent) {
             const siblings = ((parent as any).terminals ?? []) as Terminal[];
             const idx = siblings.findIndex((t) => t.id === terminalId);
             const remaining = siblings.filter((t) => t.id !== terminalId);
             if (remaining.length > 0) {
               const fallback = remaining[Math.min(idx, remaining.length - 1)];
-              if (fallback) newActive = fallback.id;
+              if (fallback) {
+                newActive = fallback.id;
+              }
             } else {
               newActive = null;
             }
@@ -353,7 +389,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
                                 (w as Worktree & { terminals?: Terminal[] }).terminals ?? []
                               ).filter((t: Terminal) => t.id !== terminalId),
                             }
-                          : w
+                          : w,
                       )
                     : p.worktrees,
                 branches:
@@ -366,11 +402,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
                                 (b as Branch & { terminals?: Terminal[] }).terminals ?? []
                               ).filter((t: Terminal) => t.id !== terminalId),
                             }
-                          : b
+                          : b,
                       )
                     : p.branches,
               }
-            : p
+            : p,
         ),
         activeTerminalId: newActive,
       };
@@ -394,7 +430,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           }
           const br = b as Branch & { terminals?: Terminal[] };
           const terminals = (br.terminals ?? []).map((t) =>
-            entityType === "terminal" && t.id === entityId ? { ...t, label } : t
+            entityType === "terminal" && t.id === entityId ? { ...t, label } : t,
           );
           return { ...b, terminals };
         });
@@ -404,7 +440,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           }
           const wt = w as Worktree & { terminals?: Terminal[] };
           const terminals = (wt.terminals ?? []).map((t) =>
-            entityType === "terminal" && t.id === entityId ? { ...t, label } : t
+            entityType === "terminal" && t.id === entityId ? { ...t, label } : t,
           );
           return { ...w, terminals };
         });
@@ -417,17 +453,23 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   getActiveTerminal: () => {
     const { projects, activeTerminalId } = get();
-    if (!activeTerminalId) return null;
+    if (!activeTerminalId) {
+      return null;
+    }
     for (const p of projects) {
       for (const w of p.worktrees) {
         const terminals = (w as Worktree & { terminals?: Terminal[] }).terminals ?? [];
         const t = terminals.find((t: Terminal) => t.id === activeTerminalId);
-        if (t) return t;
+        if (t) {
+          return t;
+        }
       }
       for (const b of p.branches) {
         const terminals = (b as Branch & { terminals?: Terminal[] }).terminals ?? [];
         const t = terminals.find((t: Terminal) => t.id === activeTerminalId);
-        if (t) return t;
+        if (t) {
+          return t;
+        }
       }
     }
     return null;
@@ -435,11 +477,15 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   getActiveWorktree: () => {
     const { projects, activeTerminalId } = get();
-    if (!activeTerminalId) return null;
+    if (!activeTerminalId) {
+      return null;
+    }
     for (const p of projects) {
       for (const w of p.worktrees) {
         const terminals = (w as Worktree & { terminals?: Terminal[] }).terminals ?? [];
-        if (terminals.some((t: Terminal) => t.id === activeTerminalId)) return w;
+        if (terminals.some((t: Terminal) => t.id === activeTerminalId)) {
+          return w;
+        }
       }
     }
     return null;
@@ -447,7 +493,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   getActiveTerminalParent: () => {
     const { projects, activeTerminalId } = get();
-    if (!activeTerminalId) return null;
+    if (!activeTerminalId) {
+      return null;
+    }
     for (const p of projects) {
       for (const w of p.worktrees) {
         const terminals = (w as Worktree & { terminals?: Terminal[] }).terminals ?? [];

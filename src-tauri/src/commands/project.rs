@@ -1,14 +1,7 @@
 use crate::models::project::{Branch, Project, Worktree, WorktreeStatus};
 use crate::services::git;
-use serde::Deserialize;
 use std::path::PathBuf;
 use uuid::Uuid;
-
-#[derive(Deserialize)]
-pub struct AddProjectPayload {
-    pub path: String,
-    pub label: Option<String>,
-}
 
 #[tauri::command]
 pub async fn add_project(path: String, label: Option<String>) -> Result<Project, String> {
@@ -35,6 +28,9 @@ pub async fn add_project(path: String, label: Option<String>) -> Result<Project,
                 project_id: String::new(),
             })
             .collect();
+
+        let _ = git::fetch_all(&repo_path);
+        let remote_branches = git::list_remote_branches(&repo_path).unwrap_or_default();
 
         let worktree_infos = git::list_worktrees(&repo_path)?;
         let worktrees = worktree_infos
@@ -65,6 +61,7 @@ pub async fn add_project(path: String, label: Option<String>) -> Result<Project,
             path: repo_path,
             label,
             branches,
+            remote_branches,
             worktrees,
         })
     }).await.map_err(|e| e.to_string())?
@@ -85,6 +82,9 @@ pub async fn refresh_project(project: Project) -> Result<Project, String> {
                 project_id: project.id.clone(),
             })
             .collect();
+
+        let _ = git::fetch_all(repo_path);
+        updated.remote_branches = git::list_remote_branches(repo_path).unwrap_or_default();
 
         let worktree_infos = git::list_worktrees(repo_path)?;
         updated.worktrees = worktree_infos

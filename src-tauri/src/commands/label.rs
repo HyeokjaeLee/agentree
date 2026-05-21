@@ -1,13 +1,5 @@
-use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-
-#[derive(Serialize, Deserialize)]
-pub struct LabelUpdate {
-    pub entity_type: String,
-    pub entity_id: String,
-    pub label: String,
-}
 
 const LABELS_FILE: &str = "labels.json";
 

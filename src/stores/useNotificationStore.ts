@@ -1,6 +1,6 @@
 import { create } from "zustand";
+import { getNotifications, markNotificationRead } from "@/lib/invoke";
 import type { AgentNotification, AgentType } from "@/types/notification";
-import * as api from "@/lib/invoke";
 
 interface NotificationState {
   notifications: AgentNotification[];
@@ -31,7 +31,9 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   pollInterval: null,
 
   startPolling: () => {
-    if (get().pollInterval) return;
+    if (get().pollInterval) {
+      return;
+    }
     const interval = setInterval(() => {
       get().fetchNotifications();
     }, 5000);
@@ -49,7 +51,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
   fetchNotifications: async () => {
     try {
-      const newNotifications = await api.getNotifications();
+      const newNotifications = await getNotifications();
       if (newNotifications.length > 0) {
         set((s) => ({
           notifications: [...newNotifications, ...s.notifications],
@@ -62,20 +64,17 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   },
 
   markRead: async (id) => {
-    await api.markNotificationRead(id);
+    await markNotificationRead(id);
     set((s) => ({
-      notifications: s.notifications.map((n) =>
-        n.id === id ? { ...n, read: true } : n
-      ),
+      notifications: s.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)),
       unreadCount: Math.max(0, s.unreadCount - 1),
     }));
   },
 
   markAllRead: async () => {
     const { notifications } = get();
-    for (const n of notifications.filter((n) => !n.read)) {
-      await api.markNotificationRead(n.id);
-    }
+    const unread = notifications.filter((item) => !item.read);
+    await Promise.all(unread.map((item) => markNotificationRead(item.id)));
     set({
       notifications: notifications.map((n) => ({ ...n, read: true })),
       unreadCount: 0,

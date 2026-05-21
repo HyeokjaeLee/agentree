@@ -1,42 +1,54 @@
-import { useState, useCallback, useMemo } from "react";
-import { useProjectStore } from "@/stores/useProjectStore";
-import { useNotificationStore, AGENT_ICONS } from "@/stores/useNotificationStore";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import {
-  useFloating,
-  useClick,
-  useDismiss,
-  useInteractions,
-  FloatingPortal,
-  FloatingFocusManager,
   autoUpdate,
+  FloatingFocusManager,
+  FloatingPortal,
   offset,
   shift,
+  useClick,
+  useDismiss,
+  useFloating,
+  useInteractions,
 } from "@floating-ui/react";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import {
   Bell,
-  Plus,
   FolderOpen,
   GitFork,
-  Terminal as TerminalIcon,
-  RefreshCw,
+  Loader2,
   MoreVertical,
   Pencil,
+  Plus,
+  RefreshCw,
+  Terminal as TerminalIcon,
   Trash2,
-  Loader2,
   X,
 } from "lucide-react";
-import type { Project, Worktree, Terminal as TerminalType } from "@/types/project";
-import type { AgentType } from "@/types/notification";
+import { useCallback, useId, useMemo, useState } from "react";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { AGENT_ICONS, useNotificationStore } from "@/stores/useNotificationStore";
+import { useProjectStore } from "@/stores/useProjectStore";
+import type { AgentType } from "@/types/notification";
+import type { Project, Terminal as TerminalType, Worktree } from "@/types/project";
 
-const POPOVER_CLASS = "z-50 rounded-md border border-border bg-popover shadow-md animate-popover-in";
+const POPOVER_CLASS =
+  "z-50 rounded-md border border-border bg-popover shadow-md animate-fade-in animate-duration-150";
 
 function usePopover(placement: "bottom-start" | "bottom-end" = "bottom-start") {
   const [open, setOpen] = useState(false);
@@ -56,91 +68,108 @@ function usePopover(placement: "bottom-start" | "bottom-end" = "bottom-start") {
 
 function NotificationBell() {
   const { notifications, unreadCount, markAllRead, markRead } = useNotificationStore();
-  const { open, refs, floatingStyles, context, getReferenceProps, getFloatingProps } = usePopover();
+  const { open, refs, context, getReferenceProps, getFloatingProps } = usePopover();
 
   return (
     <>
-      <Button ref={refs.setReference} variant="ghost" size="icon" className="relative h-7 w-7" {...getReferenceProps()}>
+      <Button
+        ref={refs.setReference}
+        variant="ghost"
+        size="icon"
+        className="relative h-7 w-7"
+        {...getReferenceProps()}
+      >
         <Bell className="h-3.5 w-3.5" />
         {unreadCount > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-destructive text-[8px] text-white font-bold">
+          <span className="absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-destructive font-bold text-[8px] text-white">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
       </Button>
-      <FloatingPortal>
-        <FloatingFocusManager context={context} modal={false}>
-          <div
-            ref={refs.setFloating}
-            style={{
-              ...floatingStyles,
-              visibility: open ? "visible" : "hidden",
-              pointerEvents: open ? "auto" : "none",
-            }}
-            className={cn(POPOVER_CLASS, "w-72 py-0")}
-            {...getFloatingProps()}
-          >
-            <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-              <span className="text-xs font-semibold">Notifications</span>
-              {unreadCount > 0 && (
-                <button
-                  onClick={markAllRead}
-                  className="text-[10px] text-primary hover:text-primary/80"
-                >
-                  Mark all read
-                </button>
-              )}
-            </div>
-            <ScrollArea className="max-h-56">
-              {notifications.length === 0 ? (
-                <p className="px-3 py-4 text-xs text-muted-foreground text-center">
-                  No notifications yet
-                </p>
-              ) : (
-                notifications.slice(0, 20).map((n) => (
-                  <div
-                    key={n.id}
-                    className={cn(
-                      "flex items-start gap-2 px-3 py-2 border-b border-border last:border-0 cursor-pointer hover:bg-accent/50",
-                      !n.read && "bg-primary/5"
-                    )}
-                    onClick={() => markRead(n.id)}
+      {open && (
+        <FloatingPortal>
+          <FloatingFocusManager context={context} modal={false}>
+            <div
+              ref={refs.setFloating}
+              className={cn(POPOVER_CLASS, "w-72 py-0")}
+              {...getFloatingProps()}
+            >
+              <div className="flex items-center justify-between border-border border-b px-3 py-2">
+                <span className="font-semibold text-xs">Notifications</span>
+                {unreadCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={markAllRead}
+                    className="text-[10px] text-primary hover:text-primary/80"
                   >
-                    <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[9px] font-bold text-primary">
-                      {AGENT_ICONS[n.agent as AgentType] || "?"}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[11px] font-medium truncate">{n.message}</p>
-                      <p className="text-[9px] text-muted-foreground">
-                        {new Date(n.timestamp * 1000).toLocaleTimeString()}
-                      </p>
-                    </div>
-                  </div>
-                ))
-              )}
-            </ScrollArea>
-          </div>
-        </FloatingFocusManager>
-      </FloatingPortal>
+                    Mark all read
+                  </button>
+                )}
+              </div>
+              <ScrollArea className="max-h-56">
+                {notifications.length === 0 ? (
+                  <p className="px-3 py-4 text-center text-muted-foreground text-xs">
+                    No notifications yet
+                  </p>
+                ) : (
+                  notifications.slice(0, 20).map((n) => (
+                    <button
+                      type="button"
+                      key={n.id}
+                      className={cn(
+                        "flex w-full cursor-pointer items-start gap-2 border-border border-b px-3 py-2 last:border-0 hover:bg-accent/50 text-left",
+                        !n.read && "bg-primary/5",
+                      )}
+                      onClick={() => markRead(n.id)}
+                    >
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 font-bold text-[9px] text-primary">
+                        {AGENT_ICONS[n.agent as AgentType] || "?"}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium text-[11px]">{n.message}</span>
+                        <span className="block text-[9px] text-muted-foreground">
+                          {new Date(n.timestamp * 1000).toLocaleTimeString()}
+                        </span>
+                      </span>
+                    </button>
+                  ))
+                )}
+              </ScrollArea>
+            </div>
+          </FloatingFocusManager>
+        </FloatingPortal>
+      )}
     </>
   );
 }
 
 function AddProjectPopover() {
+  const uid = useId();
+  const pathId = `${uid}-path`;
+  const labelId = `${uid}-label`;
   const [path, setPath] = useState("");
   const [label, setLabel] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const { open, setOpen, refs, floatingStyles, context, getReferenceProps, getFloatingProps } = usePopover();
+  const { open, setOpen, refs, context, getReferenceProps, getFloatingProps } =
+    usePopover();
   const { addProject } = useProjectStore();
 
   const handleBrowse = async () => {
-    const selected = await openDialog({ directory: true, multiple: false, title: "Select Project Folder" });
-    if (selected) setPath(selected);
+    const selected = await openDialog({
+      directory: true,
+      multiple: false,
+      title: "Select Project Folder",
+    });
+    if (selected) {
+      setPath(selected);
+    }
   };
 
   const handleSubmit = async () => {
-    if (!path.trim()) return;
+    if (!path.trim()) {
+      return;
+    }
     setLoading(true);
     setError("");
     try {
@@ -164,66 +193,80 @@ function AddProjectPopover() {
 
   return (
     <>
-      <Button ref={refs.setReference} variant="ghost" size="icon" className="h-7 w-7" {...getReferenceProps()}>
+      <Button
+        ref={refs.setReference}
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7"
+        {...getReferenceProps()}
+      >
         <Plus className="h-3.5 w-3.5" />
       </Button>
-      <FloatingPortal>
-        <FloatingFocusManager context={context} modal={false}>
-          <div
-            ref={refs.setFloating}
-            style={{
-              ...floatingStyles,
-              visibility: open ? "visible" : "hidden",
-              pointerEvents: open ? "auto" : "none",
-            }}
-            className={cn(POPOVER_CLASS, "w-64 p-0")}
-            {...getFloatingProps()}
-          >
-            <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-              <span className="text-xs font-semibold">Add Project</span>
-              <button onClick={close} className="text-muted-foreground hover:text-foreground">
-                <X className="h-3 w-3" />
-              </button>
-            </div>
-            <div className="p-3 space-y-2.5">
-              <div>
-                <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Path</label>
-                <div className="mt-1 flex gap-1.5">
-                  <Input
-                    value={path}
-                    onChange={(e) => setPath(e.target.value)}
-                    placeholder="/path/to/repo"
-                    onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-                    className="h-7 text-xs"
-                  />
-                  <Button variant="outline" size="sm" onClick={handleBrowse} className="h-7 text-xs shrink-0">
-                    <FolderOpen className="h-3 w-3 mr-1" />
-                    Browse
-                  </Button>
+      {open && (
+        <FloatingPortal>
+          <FloatingFocusManager context={context} modal={false}>
+            <div
+              ref={refs.setFloating}
+              className={cn(POPOVER_CLASS, "w-64 p-0")}
+              {...getFloatingProps()}
+            >
+              <div className="flex items-center justify-between border-border border-b px-3 py-2">
+                <span className="font-semibold text-xs">Add Project</span>
+                <button type="button" onClick={close} className="text-muted-foreground hover:text-foreground">
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+              <div className="space-y-2.5 p-3">
+                <div>
+                  <label htmlFor="add-project-path" className="font-medium text-[10px] text-muted-foreground uppercase tracking-wide">
+                    Path
+                  </label>
+                  <div className="mt-1 flex gap-1.5">
+                    <Input
+                      id="add-project-path"
+                      value={path}
+                      onChange={(e) => setPath(e.target.value)}
+                      placeholder="/path/to/repo"
+                      onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+                      className="h-7 text-xs"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleBrowse}
+                      className="h-7 shrink-0 text-xs"
+                    >
+                      <FolderOpen className="mr-1 h-3 w-3" />
+                      Browse
+                    </Button>
+                  </div>
                 </div>
+                <div>
+                  <label htmlFor="add-project-label" className="font-medium text-[10px] text-muted-foreground uppercase tracking-wide">
+                    Label (optional)
+                  </label>
+                  <Input
+                    id="add-project-label"
+                    value={label}
+                    onChange={(e) => setLabel(e.target.value)}
+                    placeholder="My Project"
+                    onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+                    className="mt-1 h-7 text-xs"
+                  />
+                </div>
+                {error && <p className="text-[10px] text-destructive">{error}</p>}
+                <Button
+                  onClick={handleSubmit}
+                  disabled={loading || !path.trim()}
+                  className="h-7 w-full text-xs"
+                >
+                  {loading ? "Adding..." : "Add Project"}
+                </Button>
               </div>
-              <div>
-                <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Label (optional)</label>
-                <Input
-                  value={label}
-                  onChange={(e) => setLabel(e.target.value)}
-                  placeholder="My Project"
-                  onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-                  className="h-7 text-xs mt-1"
-                />
-              </div>
-              {error && <p className="text-[10px] text-destructive">{error}</p>}
-              <Button
-                onClick={handleSubmit}
-                disabled={loading || !path.trim()}
-                className="w-full h-7 text-xs"
-              >
-                {loading ? "Adding..." : "Add Project"}
-              </Button>
             </div>
-          </div>
-        </FloatingFocusManager>
-      </FloatingPortal>
+          </FloatingFocusManager>
+        </FloatingPortal>
+      )}
     </>
   );
 }
@@ -231,15 +274,20 @@ function AddProjectPopover() {
 function NewWorktreePopover({ projectId }: { projectId: string }) {
   const [selectedBranch, setSelectedBranch] = useState("");
   const [label, setLabel] = useState("");
-  const { open, setOpen, refs, floatingStyles, context, getReferenceProps, getFloatingProps } = usePopover();
+  const { open, setOpen, refs, context, getReferenceProps, getFloatingProps } =
+    usePopover();
   const { createWorktree, projects } = useProjectStore();
 
   const project = projects.find((p) => p.id === projectId);
   const branches = project?.branches ?? [];
+  const remoteBranches = project?.remote_branches ?? [];
   const worktreeCount = project?.worktrees.length ?? 0;
+  const hasBranches = branches.length > 0 || remoteBranches.length > 0;
 
   const handleSubmit = () => {
-    if (!selectedBranch.trim()) return;
+    if (!selectedBranch.trim()) {
+      return;
+    }
     createWorktree(projectId, selectedBranch.trim(), label.trim() || undefined);
     setSelectedBranch("");
     setLabel("");
@@ -258,62 +306,91 @@ function NewWorktreePopover({ projectId }: { projectId: string }) {
         ref={refs.setReference}
         variant="ghost"
         size="icon"
-        className="h-5 w-5 shrink-0 opacity-0 group-hover:opacity-100 text-primary"
+        className="h-5 w-5 shrink-0 text-primary opacity-0 group-hover:opacity-100"
         {...getReferenceProps()}
       >
         <Plus className="h-3 w-3" />
       </Button>
-      <FloatingPortal>
-        <FloatingFocusManager context={context} modal={false}>
-          <div
-            ref={refs.setFloating}
-            style={{
-              ...floatingStyles,
-              visibility: open ? "visible" : "hidden",
-              pointerEvents: open ? "auto" : "none",
-            }}
-            className={cn(POPOVER_CLASS, "w-60 p-0")}
-            {...getFloatingProps()}
-          >
-            <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-              <span className="text-xs font-semibold">New Worktree</span>
-              <button onClick={close} className="text-muted-foreground hover:text-foreground">
-                <X className="h-3 w-3" />
-              </button>
-            </div>
-            <div className="p-3 space-y-2.5">
-              <div>
-                <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Branch</label>
-                <Select value={selectedBranch} onValueChange={setSelectedBranch} disabled={branches.length === 0}>
-                  <SelectTrigger className="h-7 text-xs mt-1">
-                    <SelectValue placeholder="Select branch" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {branches.map((branch) => (
-                      <SelectItem key={branch.id} value={branch.name} className="text-xs">
-                        {branch.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+      {open && (
+        <FloatingPortal>
+          <FloatingFocusManager context={context} modal={false}>
+            <div
+              ref={refs.setFloating}
+              className={cn(POPOVER_CLASS, "w-60 p-0")}
+              {...getFloatingProps()}
+            >
+              <div className="flex items-center justify-between border-border border-b px-3 py-2">
+                <span className="font-semibold text-xs">New Worktree</span>
+                <button type="button" onClick={close} className="text-muted-foreground hover:text-foreground">
+                  <X className="h-3 w-3" />
+                </button>
               </div>
-              <div>
-                <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Label</label>
-                <Input
-                  value={label}
-                  onChange={(e) => setLabel(e.target.value)}
-                  placeholder={`${selectedBranch || "branch"}-agentree-${worktreeCount + 1}`}
-                  onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-                  className="h-7 text-xs mt-1"
-                />
+              <div className="space-y-2.5 p-3">
+                <div>
+                  <label htmlFor="new-worktree-branch" className="font-medium text-[10px] text-muted-foreground uppercase tracking-wide">
+                    Branch
+                  </label>
+                  <Select
+                    value={selectedBranch}
+                    onValueChange={setSelectedBranch}
+                    disabled={!hasBranches}
+                  >
+                    <SelectTrigger id="new-worktree-branch" className="mt-1 h-7 text-xs">
+                      <SelectValue placeholder="Select branch" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {branches.length > 0 && (
+                        <>
+                          <div className="px-2 py-1 font-semibold text-[9px] text-muted-foreground uppercase tracking-wider">
+                            Local
+                          </div>
+                          {branches.map((branch) => (
+                            <SelectItem key={branch.id} value={branch.name} className="text-xs">
+                              {branch.name}
+                            </SelectItem>
+                          ))}
+                        </>
+                      )}
+                      {remoteBranches.length > 0 && (
+                        <>
+                          <div className="mt-1 border-border border-t px-2 py-1 font-semibold text-[9px] text-muted-foreground uppercase tracking-wider">
+                            Remote
+                          </div>
+                          {remoteBranches.map((rb) => (
+                            <SelectItem key={rb} value={rb} className="text-xs">
+                              {rb}
+                            </SelectItem>
+                          ))}
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label htmlFor="new-worktree-label" className="font-medium text-[10px] text-muted-foreground uppercase tracking-wide">
+                    Label
+                  </label>
+                  <Input
+                    id="new-worktree-label"
+                    value={label}
+                    onChange={(e) => setLabel(e.target.value)}
+                    placeholder={`${selectedBranch || "branch"}-agentree-${worktreeCount + 1}`}
+                    onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+                    className="mt-1 h-7 text-xs"
+                  />
+                </div>
+                <Button
+                  onClick={handleSubmit}
+                  disabled={!selectedBranch.trim()}
+                  className="h-7 w-full text-xs"
+                >
+                  Create Worktree
+                </Button>
               </div>
-              <Button onClick={handleSubmit} disabled={!selectedBranch.trim()} className="w-full h-7 text-xs">
-                Create Worktree
-              </Button>
             </div>
-          </div>
-        </FloatingFocusManager>
-      </FloatingPortal>
+          </FloatingFocusManager>
+        </FloatingPortal>
+      )}
     </>
   );
 }
@@ -326,8 +403,6 @@ function WorktreeCard({
   onRename,
   activeTerminalId,
   onTerminalClick,
-  onTerminalClose,
-  onAddTerminal,
   onWorktreeClick,
 }: {
   worktree: Worktree;
@@ -337,13 +412,18 @@ function WorktreeCard({
   onRename: (label: string) => void;
   activeTerminalId: string | null;
   onTerminalClick: (terminalId: string) => void;
-  onTerminalClose: (terminalId: string) => void;
-  onAddTerminal: () => void;
   onWorktreeClick: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(worktree.label || "");
-  const { open: menuOpen, setOpen: setMenuOpen, refs: menuRefs, floatingStyles: menuStyles, context: menuContext, getReferenceProps: getMenuRefProps, getFloatingProps: getMenuFloatProps } = usePopover();
+  const {
+    open: menuOpen,
+    setOpen: setMenuOpen,
+    refs: menuRefs,
+    context: menuContext,
+    getReferenceProps: getMenuRefProps,
+    getFloatingProps: getMenuFloatProps,
+  } = usePopover();
 
   const terminals = (worktree as Worktree & { terminals?: TerminalType[] }).terminals ?? [];
 
@@ -362,28 +442,36 @@ function WorktreeCard({
     setEditing(true);
   };
 
+  const menuRefProps = getMenuRefProps();
+  const handleMenuButtonClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+  }, []);
+
   if (editing) {
     return (
       <AccordionItem value={worktree.id} className="border-none">
         <div
           className={cn(
-            "w-full flex items-center gap-2 px-3 py-2",
-            "bg-card border-y border-primary/30"
+            "flex w-full items-center gap-2 px-3 py-2",
+            "border-border border-b bg-card",
           )}
         >
-          <span className={cn("h-2 w-2 rounded-full shrink-0", statusColor)} />
+          <span className={cn("h-2 w-2 shrink-0 rounded-full", statusColor)} />
           <GitFork className="h-3.5 w-3.5 shrink-0 text-primary" />
           <input
-            autoFocus
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onBlur={() => {
-              if (draft.trim()) onRename(draft.trim());
+              if (draft.trim()) {
+                onRename(draft.trim());
+              }
               setEditing(false);
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
-                if (draft.trim()) onRename(draft.trim());
+                if (draft.trim()) {
+                  onRename(draft.trim());
+                }
                 setEditing(false);
               }
               if (e.key === "Escape") {
@@ -392,37 +480,42 @@ function WorktreeCard({
               }
             }}
             onClick={(e) => e.stopPropagation()}
-            className="flex-1 min-w-0 bg-secondary text-xs text-foreground outline-none px-1.5 py-0.5"
+            className="min-w-0 flex-1 bg-secondary px-1.5 py-0.5 text-foreground text-xs outline-none"
           />
         </div>
       </AccordionItem>
     );
   }
 
-  const menuRefProps = getMenuRefProps();
-  const handleMenuButtonClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-  }, []);
-
   return (
     <AccordionItem value={worktree.id} className="border-none">
       <AccordionTrigger
         className={cn(
-          "group w-full flex items-center gap-2 px-3 py-2 text-left transition-colors cursor-pointer hover:no-underline",
+          "group flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left transition-colors hover:no-underline",
           isActive
-            ? "bg-primary/10 border-y border-primary/30"
-            : "hover:bg-accent/50 border-y border-transparent",
-          loading && "opacity-60 pointer-events-none",
-          "[&>svg]:hidden"
+            ? "border-border border-b bg-primary/10"
+            : "border-transparent border-b hover:bg-accent/50",
+          loading && "pointer-events-none opacity-60",
+          "[&>svg]:hidden",
         )}
         onClick={() => {
           onWorktreeClick();
         }}
       >
-        <span className={cn("h-2 w-2 rounded-full shrink-0", statusColor)} />
-        <GitFork className={cn("h-3.5 w-3.5 shrink-0", isActive ? "text-primary" : "text-muted-foreground")} />
-        <div className="flex-1 min-w-0">
-          <span className={cn("block truncate text-xs font-medium", isActive ? "text-primary" : "text-foreground")}>
+        <span className={cn("h-2 w-2 shrink-0 rounded-full", statusColor)} />
+        <GitFork
+          className={cn(
+            "h-3.5 w-3.5 shrink-0",
+            isActive ? "text-primary" : "text-muted-foreground",
+          )}
+        />
+        <div className="min-w-0 flex-1">
+          <span
+            className={cn(
+              "block truncate font-medium text-xs",
+              isActive ? "text-primary" : "text-foreground",
+            )}
+          >
             {worktree.label || worktree.branch || "detached"}
           </span>
           <span className="block truncate text-[10px] text-muted-foreground">
@@ -432,83 +525,74 @@ function WorktreeCard({
         {loading ? (
           <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
         ) : (
-          <div
+          <button
+            type="button"
             ref={menuRefs.setReference}
             className={cn(
-              "shrink-0 h-5 w-5 flex items-center justify-center hover:bg-accent text-muted-foreground hover:text-foreground",
-              !menuOpen && "opacity-0 group-hover:opacity-100"
+              "flex h-5 w-5 shrink-0 items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground",
+              !menuOpen && "opacity-0 group-hover:opacity-100",
             )}
             onClick={handleMenuButtonClick}
             {...menuRefProps}
           >
             <MoreVertical className="h-3.5 w-3.5" />
-          </div>
+          </button>
         )}
       </AccordionTrigger>
-      <AccordionContent className="border-b">
-        <div className={cn(
-          "bg-card py-1 px-1",
-          isActive ? "border-primary/30 bg-primary/5" : "border-border"
-        )}>
+      <AccordionContent>
+        <div className={cn(isActive && "bg-primary/5")}>
           {terminals.map((t) => (
-            <div
+            <button
+              type="button"
               key={t.id}
               className={cn(
-                "flex items-center gap-1.5 px-2.5 py-1 text-xs cursor-pointer group",
+                "group flex w-full cursor-pointer items-center px-3 py-1.5 text-xs text-left",
                 t.id === activeTerminalId
-                  ? "bg-primary/15 text-primary font-medium"
-                  : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                  ? "bg-primary/15 font-medium text-primary"
+                  : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
               )}
-              onClick={(e) => { e.stopPropagation(); onTerminalClick(t.id); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onTerminalClick(t.id);
+              }}
             >
-              <TerminalIcon className="h-3 w-3 shrink-0" />
-              <span className="flex-1 min-w-0 truncate">{t.name}</span>
-              <button
-                onClick={(e) => { e.stopPropagation(); onTerminalClose(t.id); }}
-                className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </div>
+              <span className="min-w-0 flex-1 truncate">{t.name}</span>
+            </button>
           ))}
-          <button
-            onClick={(e) => { e.stopPropagation(); onAddTerminal(); }}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] text-muted-foreground hover:text-primary hover:bg-accent/50 w-full cursor-pointer"
-          >
-            <Plus className="h-3 w-3" />
-            <span>Add terminal</span>
-          </button>
         </div>
       </AccordionContent>
-      <FloatingPortal>
-        <FloatingFocusManager context={menuContext} modal={false}>
-          <div
-            ref={menuRefs.setFloating}
-            style={{
-              ...menuStyles,
-              visibility: menuOpen ? "visible" : "hidden",
-              pointerEvents: menuOpen ? "auto" : "none",
-            }}
-            className={cn(POPOVER_CLASS, "w-36 py-1")}
-            {...getMenuFloatProps()}
-          >
-            <button
-              onClick={startEdit}
-              className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-foreground hover:bg-accent"
+      {menuOpen && (
+        <FloatingPortal>
+          <FloatingFocusManager context={menuContext} modal={false}>
+            <div
+              ref={menuRefs.setFloating}
+              className={cn(POPOVER_CLASS, "w-36 py-1")}
+              {...getMenuFloatProps()}
             >
-              <Pencil className="h-3 w-3" />
-              Edit Label
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onDelete(); }}
-              className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-destructive hover:bg-accent"
-            >
-              <Trash2 className="h-3 w-3" />
-              Delete
-            </button>
-          </div>
-        </FloatingFocusManager>
-      </FloatingPortal>
+              <button
+                type="button"
+                onClick={startEdit}
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-foreground text-xs hover:bg-accent"
+              >
+                <Pencil className="h-3 w-3" />
+                Edit Label
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMenuOpen(false);
+                  onDelete();
+                }}
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-destructive text-xs hover:bg-accent"
+              >
+                <Trash2 className="h-3 w-3" />
+                Delete
+              </button>
+            </div>
+          </FloatingFocusManager>
+        </FloatingPortal>
+      )}
     </AccordionItem>
   );
 }
@@ -518,7 +602,6 @@ function ProjectSection({ project }: { project: Project }) {
     activeTerminalId,
     setActiveTerminal,
     addTerminal,
-    removeTerminal,
     removeWorktree,
     setLabel,
     refreshProject,
@@ -529,28 +612,34 @@ function ProjectSection({ project }: { project: Project }) {
   const worktrees = project.worktrees;
 
   const activeWorktree = useMemo(() => {
-    if (!activeTerminalId) return null;
+    if (!activeTerminalId) {
+      return null;
+    }
     for (const w of worktrees) {
       const terminals = (w as Worktree & { terminals?: TerminalType[] }).terminals ?? [];
-      if (terminals.some((t) => t.id === activeTerminalId)) return w;
+      if (terminals.some((t) => t.id === activeTerminalId)) {
+        return w;
+      }
     }
     return null;
   }, [activeTerminalId, worktrees]);
 
   const handleWorktreeClick = useCallback(
     (worktree: Worktree) => {
-      if (worktree.id.startsWith("temp-") || deletingIds.has(worktree.id)) return;
+      if (worktree.id.startsWith("temp-") || deletingIds.has(worktree.id)) {
+        return;
+      }
       const terminals = (worktree as Worktree & { terminals?: TerminalType[] }).terminals ?? [];
       const first = terminals[0];
       if (first) {
-        if (!activeTerminalId || !terminals.some((t) => t.id === activeTerminalId)) {
+        if (!(activeTerminalId && terminals.some((t) => t.id === activeTerminalId))) {
           setActiveTerminal(first.id);
         }
       } else {
         addTerminal(project.id, worktree.id, "worktree");
       }
     },
-    [project.id, activeTerminalId, setActiveTerminal, addTerminal, deletingIds]
+    [project.id, activeTerminalId, setActiveTerminal, addTerminal, deletingIds],
   );
 
   const handleDelete = useCallback(
@@ -566,35 +655,21 @@ function ProjectSection({ project }: { project: Project }) {
         });
       }
     },
-    [project.id, removeWorktree]
+    [project.id, removeWorktree],
   );
 
   const handleRename = useCallback(
     (worktreeId: string, label: string) => {
       setLabel("worktree", worktreeId, label);
     },
-    [setLabel]
-  );
-
-  const handleTerminalClose = useCallback(
-    (worktreeId: string, terminalId: string) => {
-      removeTerminal(project.id, worktreeId, "worktree", terminalId);
-    },
-    [project.id, removeTerminal]
-  );
-
-  const handleAddTerminal = useCallback(
-    (worktreeId: string) => {
-      addTerminal(project.id, worktreeId, "worktree");
-    },
-    [project.id, addTerminal]
+    [setLabel],
   );
 
   return (
-    <div className="pb-2">
-      <div className="flex items-center gap-1.5 px-3 py-1.5 group">
+    <div className="border-border border-b pb-2">
+      <div className="group flex items-center gap-1.5 px-3 py-1.5">
         <FolderOpen className="h-3.5 w-3.5 shrink-0 text-primary" />
-        <span className="flex-1 min-w-0 truncate text-xs font-semibold text-foreground">
+        <span className="min-w-0 flex-1 truncate font-semibold text-foreground text-xs">
           {project.label || project.name}
         </span>
         <Button
@@ -621,8 +696,6 @@ function ProjectSection({ project }: { project: Project }) {
               onRename={(label) => handleRename(w.id, label)}
               activeTerminalId={activeTerminalId}
               onTerminalClick={setActiveTerminal}
-              onTerminalClose={(tId) => handleTerminalClose(w.id, tId)}
-              onAddTerminal={() => handleAddTerminal(w.id)}
               onWorktreeClick={() => handleWorktreeClick(w)}
             />
           );
@@ -632,59 +705,18 @@ function ProjectSection({ project }: { project: Project }) {
   );
 }
 
-function SidebarFooter() {
-  const {
-    activeTerminalId,
-    getActiveWorktree,
-    getProjectById,
-    getActiveTerminalParent,
-    switchBranch,
-  } = useProjectStore();
-
-  const activeWorktree = getActiveWorktree();
-  const terminalParent = getActiveTerminalParent();
-
-  if (!activeTerminalId || !activeWorktree || !terminalParent) return null;
-
-  const project = getProjectById(terminalParent.projectId);
-  if (!project) return null;
-
-  const currentBranch = activeWorktree.branch;
-
-  const handleBranchChange = async (newBranch: string) => {
-    if (newBranch === currentBranch) return;
-    await switchBranch(terminalParent.projectId, newBranch, activeWorktree.path);
-  };
-
-  return (
-    <div className="border-t border-border px-3 py-2">
-      <Select value={currentBranch} onValueChange={handleBranchChange}>
-        <SelectTrigger className="h-7 w-full text-xs bg-card border-border">
-          <GitFork className="h-3 w-3 mr-1.5 text-muted-foreground" />
-          <SelectValue placeholder="Select branch" />
-        </SelectTrigger>
-        <SelectContent>
-          {project.branches.map((branch) => (
-            <SelectItem key={branch.id} value={branch.name} className="text-xs">
-              {branch.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-}
-
 export function Sidebar() {
   const { projects } = useProjectStore();
 
   return (
     <TooltipProvider>
-      <div className="flex h-full w-full flex-col border-r border-sidebar-border bg-sidebar">
-        <div className="flex items-center justify-between px-3 py-2 border-b border-sidebar-border shrink-0">
+      <div className="flex h-full w-full flex-col border-sidebar-border border-r bg-sidebar">
+        <div className="flex shrink-0 items-center justify-between border-sidebar-border border-b px-3 py-2">
           <div className="flex items-center gap-2">
             <TerminalIcon className="h-4 w-4 text-primary" />
-            <span className="text-sm font-bold tracking-tight text-sidebar-foreground">Agentree</span>
+            <span className="font-bold text-sidebar-foreground text-sm tracking-tight">
+              Agentree
+            </span>
           </div>
           <div className="flex items-center gap-0.5">
             <NotificationBell />
@@ -695,7 +727,7 @@ export function Sidebar() {
           {projects.length === 0 ? (
             <div className="flex flex-col items-center gap-2 p-6 text-center">
               <FolderOpen className="h-8 w-8 text-muted-foreground" />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-muted-foreground text-xs">
                 No projects yet.
                 <br />
                 Click + to add one.
@@ -709,7 +741,6 @@ export function Sidebar() {
             </div>
           )}
         </ScrollArea>
-        <SidebarFooter />
       </div>
     </TooltipProvider>
   );

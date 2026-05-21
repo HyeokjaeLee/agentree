@@ -1,0 +1,106 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true,
+    "root": "."
+  },
+  "files": {
+    "includes": [
+      "src/**/*.ts",
+      "src/**/*.tsx",
+      "src/**/*.css",
+      "vite.config.ts",
+      "!src/components/ui"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100,
+    "lineEnding": "lf"
+  },
+  "linter": {
+    "enabled": true,
+    "domains": {
+      "react": "all"
+    },
+    "rules": {
+      "recommended": true,
+      "a11y": "error",
+      "complexity": {
+        "recommended": true,
+        "noExcessiveLinesPerFunction": "warn",
+        "noExcessiveCognitiveComplexity": "warn"
+      },
+      "correctness": "error",
+      "performance": "error",
+      "security": "error",
+      "style": {
+        "recommended": true,
+        "noJsxLiterals": "off",
+        "noMagicNumbers": "off",
+        "useNamingConvention": "off",
+        "noDefaultExport": "off",
+        "noProcessEnv": "off"
+      },
+      "suspicious": {
+        "recommended": true,
+        "useAwait": "warn"
+      },
+      "nursery": {
+        "recommended": true,
+        "noHexColors": "off",
+        "noTernary": "off",
+        "useExplicitType": "off",
+        "useExplicitReturnType": "off",
+        "noShadow": "warn",
+        "noExcessiveLinesPerFile": "warn"
+      }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "semicolons": "always",
+      "trailingCommas": "all",
+      "quoteStyle": "double",
+      "quoteProperties": "asNeeded",
+      "bracketSpacing": true,
+      "bracketSameLine": false,
+      "arrowParentheses": "always"
+    }
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    },
+    "formatter": {
+      "enabled": true
+    },
+    "linter": {
+      "enabled": true
+    }
+  },
+  "json": {
+    "formatter": {
+      "enabled": false
+    }
+  },
+  "assist": {
+    "enabled": true
+  },
+  "overrides": [
+    {
+      "includes": ["vite.config.ts"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noNodejsModules": "off"
+          }
+        }
+      }
+    }
+  ]
+}

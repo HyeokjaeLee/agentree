@@ -8,6 +8,8 @@ pub struct Project {
     pub path: PathBuf,
     pub label: Option<String>,
     pub branches: Vec<Branch>,
+    #[serde(default)]
+    pub remote_branches: Vec<String>,
     pub worktrees: Vec<Worktree>,
 }
 

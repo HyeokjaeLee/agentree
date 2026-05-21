@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { getGhosttyConfig, type GhosttyConfig } from "@/lib/invoke";
+import { useEffect, useState } from "react";
+import { type GhosttyConfig, getGhosttyConfig } from "@/lib/invoke";
 
 interface TerminalTheme {
   background: string;
@@ -49,30 +49,45 @@ const DEFAULT_THEME: TerminalTheme = {
   brightWhite: "#eaecef",
 };
 
+const PALETTE_KEYS: Array<{ ghostty: string; theme: keyof TerminalTheme }> = [
+  { ghostty: "black", theme: "black" },
+  { ghostty: "red", theme: "red" },
+  { ghostty: "green", theme: "green" },
+  { ghostty: "yellow", theme: "yellow" },
+  { ghostty: "blue", theme: "blue" },
+  { ghostty: "magenta", theme: "magenta" },
+  { ghostty: "cyan", theme: "cyan" },
+  { ghostty: "white", theme: "white" },
+  { ghostty: "bright_black", theme: "brightBlack" },
+  { ghostty: "bright_red", theme: "brightRed" },
+  { ghostty: "bright_green", theme: "brightGreen" },
+  { ghostty: "bright_yellow", theme: "brightYellow" },
+  { ghostty: "bright_blue", theme: "brightBlue" },
+  { ghostty: "bright_magenta", theme: "brightMagenta" },
+  { ghostty: "bright_cyan", theme: "brightCyan" },
+  { ghostty: "bright_white", theme: "brightWhite" },
+];
+
+function resolvePalette(palette: Record<string, string>): Partial<TerminalTheme> {
+  const colors: Partial<TerminalTheme> = {};
+  for (const { ghostty, theme } of PALETTE_KEYS) {
+    const value = palette[ghostty];
+    if (value) {
+      colors[theme] = value;
+    }
+  }
+  return colors;
+}
+
 function ghosttyToTheme(cfg: GhosttyConfig): TerminalTheme {
-  const p = cfg.palette;
   return {
+    ...DEFAULT_THEME,
+    ...resolvePalette(cfg.palette),
     background: cfg.background,
     foreground: cfg.foreground,
     cursor: cfg.foreground,
     cursorAccent: cfg.background,
     selectionBackground: `${cfg.foreground}40`,
-    black: p["black"] ?? DEFAULT_THEME.black,
-    red: p["red"] ?? DEFAULT_THEME.red,
-    green: p["green"] ?? DEFAULT_THEME.green,
-    yellow: p["yellow"] ?? DEFAULT_THEME.yellow,
-    blue: p["blue"] ?? DEFAULT_THEME.blue,
-    magenta: p["magenta"] ?? DEFAULT_THEME.magenta,
-    cyan: p["cyan"] ?? DEFAULT_THEME.cyan,
-    white: p["white"] ?? DEFAULT_THEME.white,
-    brightBlack: p["bright_black"] ?? DEFAULT_THEME.brightBlack,
-    brightRed: p["bright_red"] ?? DEFAULT_THEME.brightRed,
-    brightGreen: p["bright_green"] ?? DEFAULT_THEME.brightGreen,
-    brightYellow: p["bright_yellow"] ?? DEFAULT_THEME.brightYellow,
-    brightBlue: p["bright_blue"] ?? DEFAULT_THEME.brightBlue,
-    brightMagenta: p["bright_magenta"] ?? DEFAULT_THEME.brightMagenta,
-    brightCyan: p["bright_cyan"] ?? DEFAULT_THEME.brightCyan,
-    brightWhite: p["bright_white"] ?? DEFAULT_THEME.brightWhite,
   };
 }
 

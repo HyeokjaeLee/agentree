@@ -1,0 +1,36 @@
+{
+  "languages": {
+    "JavaScript": {
+      "formatter": [
+        { "language_server": { "name": "biome" } },
+        { "code_action": "source.organizeImports.biome" },
+        { "code_action": "source.fixAll.biome" },
+      ],
+      "format_on_save": "on",
+    },
+    "TypeScript": {
+      "formatter": [
+        { "language_server": { "name": "biome" } },
+        { "code_action": "source.organizeImports.biome" },
+        { "code_action": "source.fixAll.biome" },
+      ],
+      "format_on_save": "on",
+    },
+    "TSX": {
+      "formatter": [
+        { "language_server": { "name": "biome" } },
+        { "code_action": "source.organizeImports.biome" },
+        { "code_action": "source.fixAll.biome" },
+      ],
+      "format_on_save": "on",
+    },
+    "Rust": {
+      "formatter": {
+        "language_server": {
+          "name": "rust-analyzer",
+        },
+      },
+      "format_on_save": "on",
+    },
+  },
+}

@@ -1,12 +1,13 @@
-import { useState, useEffect } from "react";
+import { open } from "@tauri-apps/plugin-dialog";
+import { useEffect, useId, useState } from "react";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -17,9 +18,9 @@ import {
 } from "@/components/ui/select";
 import { useProjectStore } from "@/stores/useProjectStore";
 import { useUIStore } from "@/stores/useUIStore";
-import { open } from "@tauri-apps/plugin-dialog";
 
 export function AddProjectDialog() {
+  const uid = useId();
   const { addProjectDialogOpen, setAddProjectDialogOpen } = useUIStore();
   const { addProject } = useProjectStore();
   const [path, setPath] = useState("");
@@ -39,7 +40,9 @@ export function AddProjectDialog() {
   };
 
   const handleSubmit = async () => {
-    if (!path.trim()) return;
+    if (!path.trim()) {
+      return;
+    }
     setLoading(true);
     setError("");
     try {
@@ -65,9 +68,10 @@ export function AddProjectDialog() {
         </DialogHeader>
         <div className="space-y-3">
           <div>
-            <label className="text-xs font-medium text-muted-foreground">Repository Path</label>
+            <label htmlFor={`${uid}-repo`} className="font-medium text-muted-foreground text-xs">Repository Path</label>
             <div className="mt-1 flex gap-2">
               <Input
+                id={`${uid}-repo`}
                 value={path}
                 onChange={(e) => setPath(e.target.value)}
                 placeholder="/path/to/repo"
@@ -79,10 +83,9 @@ export function AddProjectDialog() {
             </div>
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground">
-              Label (optional)
-            </label>
+            <label htmlFor="project-label" className="font-medium text-muted-foreground text-xs">Label (optional)</label>
             <Input
+              id="project-label"
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               placeholder="My Project"
@@ -90,7 +93,7 @@ export function AddProjectDialog() {
               className="mt-1"
             />
           </div>
-          {error && <p className="text-xs text-destructive">{error}</p>}
+          {error && <p className="text-destructive text-xs">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setAddProjectDialogOpen(false)}>
               Cancel
@@ -113,7 +116,9 @@ export function NewBranchDialog() {
   const [error, setError] = useState("");
 
   const handleSubmit = async () => {
-    if (!name.trim() || !newBranchDialogProjectId) return;
+    if (!(name.trim() && newBranchDialogProjectId)) {
+      return;
+    }
     setLoading(true);
     setError("");
     try {
@@ -128,7 +133,7 @@ export function NewBranchDialog() {
   };
 
   return (
-    <Dialog open={!!newBranchDialogProjectId} onOpenChange={() => closeNewBranchDialog()}>
+    <Dialog open={Boolean(newBranchDialogProjectId)} onOpenChange={() => closeNewBranchDialog()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>New Branch</DialogTitle>
@@ -136,17 +141,18 @@ export function NewBranchDialog() {
         </DialogHeader>
         <div className="space-y-3">
           <div>
-            <label className="text-xs font-medium text-muted-foreground">Branch Name</label>
+            <label htmlFor="branch-name" className="font-medium text-muted-foreground text-xs">Branch Name</label>
             <Input
+              id="branch-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="feature/my-feature"
               onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
               className="mt-1"
-              autoFocus
+              autoFocus={true}
             />
           </div>
-          {error && <p className="text-xs text-destructive">{error}</p>}
+          {error && <p className="text-destructive text-xs">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={closeNewBranchDialog}>
               Cancel
@@ -178,27 +184,27 @@ export function NewWorktreeDialog() {
     }
   }, [newWorktreeDialogProjectId, newWorktreeDialogBranch]);
 
-  const handleSubmit = () => {
-    if (!newWorktreeDialogProjectId || !selectedBranch.trim()) return;
-
-    createWorktree(
-      newWorktreeDialogProjectId,
-      selectedBranch.trim(),
-      label.trim() || undefined,
-    );
+  const closeAndReset = () => {
     setSelectedBranch("");
     setLabel("");
     closeNewWorktreeDialog();
   };
 
+  const handleSubmit = () => {
+    if (!(newWorktreeDialogProjectId && selectedBranch.trim())) {
+      return;
+    }
+
+    createWorktree(newWorktreeDialogProjectId, selectedBranch.trim(), label.trim() || undefined);
+    closeAndReset();
+  };
+
   return (
     <Dialog
-      open={!!newWorktreeDialogProjectId}
-      onOpenChange={(open) => {
-        if (!open) {
-          setSelectedBranch("");
-          setLabel("");
-          closeNewWorktreeDialog();
+      open={Boolean(newWorktreeDialogProjectId)}
+      onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          closeAndReset();
         }
       }}
     >
@@ -209,7 +215,7 @@ export function NewWorktreeDialog() {
         </DialogHeader>
         <div className="space-y-3">
           <div>
-            <label className="text-xs font-medium text-muted-foreground">Base Branch</label>
+            <label htmlFor="base-branch" className="font-medium text-muted-foreground text-xs">Base Branch</label>
             <Select
               value={selectedBranch}
               onValueChange={setSelectedBranch}
@@ -228,35 +234,25 @@ export function NewWorktreeDialog() {
             </Select>
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground">
-              Label
-            </label>
+            <label htmlFor="worktree-label" className="font-medium text-muted-foreground text-xs">Label</label>
             <Input
+              id="worktree-label"
               value={label}
               onChange={(e) => setLabel(e.target.value)}
-              placeholder={`${selectedBranch || 'branch'}-agentree-${(project?.worktrees.length ?? 0) + 1}`}
+              placeholder={`${selectedBranch || "branch"}-agentree-${(project?.worktrees.length ?? 0) + 1}`}
               onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
               className="mt-1"
             />
-            <p className="text-[10px] text-muted-foreground mt-1">
-              Leave empty to auto-generate
-            </p>
+            <p className="mt-1 text-[10px] text-muted-foreground">Leave empty to auto-generate</p>
           </div>
           <div className="flex justify-end gap-2">
             <Button
               variant="outline"
-              onClick={() => {
-                setSelectedBranch("");
-                setLabel("");
-                closeNewWorktreeDialog();
-              }}
+              onClick={closeAndReset}
             >
               Cancel
             </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={!selectedBranch.trim()}
-            >
+            <Button onClick={handleSubmit} disabled={!selectedBranch.trim()}>
               Create Worktree
             </Button>
           </div>

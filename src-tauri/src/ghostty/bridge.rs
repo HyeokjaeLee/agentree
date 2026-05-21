@@ -24,17 +24,23 @@ static GHOSTTY_RUNTIME: Lazy<GhosttyRuntime> = Lazy::new(|| {
 fn find_library() -> Option<PathBuf> {
     let candidates: Vec<Option<PathBuf>> = vec![
         std::env::current_exe().ok().and_then(|exe| {
-            exe.parent().map(|dir| dir.join("../Resources/libghostty.dylib"))
+            exe.parent()
+                .map(|dir| dir.join("../Resources/libghostty.dylib"))
         }),
         std::env::current_exe().ok().and_then(|exe| {
-            exe.parent().map(|dir| dir.join("resources/libghostty.dylib"))
+            exe.parent()
+                .map(|dir| dir.join("resources/libghostty.dylib"))
         }),
         Some(PathBuf::from("src-tauri/resources/libghostty.dylib")),
     ];
 
     for candidate in candidates.iter().flatten() {
         if candidate.exists() {
-            return Some(candidate.canonicalize().unwrap_or_else(|_| candidate.clone()));
+            return Some(
+                candidate
+                    .canonicalize()
+                    .unwrap_or_else(|_| candidate.clone()),
+            );
         }
     }
     None

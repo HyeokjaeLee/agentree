@@ -1,89 +1,89 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { Project, Branch, Worktree } from "@/types/project";
 import type { AgentreeConfig } from "@/types/config";
 import type { AgentNotification } from "@/types/notification";
+import type { Branch, Project, Worktree } from "@/types/project";
 
-export async function addProject(path: string, label?: string): Promise<Project> {
+export function addProject(path: string, label?: string): Promise<Project> {
   return invoke("add_project", { path, label });
 }
 
-export async function refreshProject(project: Project): Promise<Project> {
+export function refreshProject(project: Project): Promise<Project> {
   return invoke("refresh_project", { project });
 }
 
-export async function createBranch(projectPath: string, name: string): Promise<Branch> {
+export function createBranch(projectPath: string, name: string): Promise<Branch> {
   return invoke("create_branch", { projectPath, name });
 }
 
-export async function deleteBranch(projectPath: string, name: string): Promise<void> {
+export function deleteBranch(projectPath: string, name: string): Promise<void> {
   return invoke("delete_branch", { projectPath, name });
 }
 
-export async function listBranches(projectPath: string): Promise<Branch[]> {
+export function listBranches(projectPath: string): Promise<Branch[]> {
   return invoke("list_branches", { projectPath });
 }
 
-export async function createWorktree(
+export function fetchRemoteBranches(projectPath: string): Promise<string[]> {
+  return invoke("fetch_remote_branches", { projectPath });
+}
+
+export function createWorktree(
   projectPath: string,
   branch: string,
-  label?: string
+  label?: string,
 ): Promise<Worktree> {
   return invoke("create_worktree", { projectPath, branch, label });
 }
 
-export async function removeWorktree(projectPath: string, worktreePath: string): Promise<void> {
+export function removeWorktree(projectPath: string, worktreePath: string): Promise<void> {
   return invoke("remove_worktree", { projectPath, worktreePath });
 }
 
-export async function listWorktrees(projectPath: string): Promise<Worktree[]> {
+export function listWorktrees(projectPath: string): Promise<Worktree[]> {
   return invoke("list_worktrees", { projectPath });
 }
 
-export async function switchBranch(
+export function switchBranch(
   projectPath: string,
   branch: string,
-  worktreePath?: string
+  worktreePath?: string,
 ): Promise<void> {
   return invoke("switch_branch", { projectPath, branch, worktreePath: worktreePath ?? null });
 }
 
-export async function readConfig(projectPath: string): Promise<AgentreeConfig> {
+export function readConfig(projectPath: string): Promise<AgentreeConfig> {
   return invoke("read_config", { projectPath });
 }
 
-export async function writeConfig(projectPath: string, config: AgentreeConfig): Promise<void> {
+export function writeConfig(projectPath: string, config: AgentreeConfig): Promise<void> {
   return invoke("write_config", { projectPath, config });
 }
 
-export async function setLabel(
-  entityType: string,
-  entityId: string,
-  label: string
-): Promise<void> {
+export function setLabel(entityType: string, entityId: string, label: string): Promise<void> {
   return invoke("set_label", { entityType, entityId, label });
 }
 
-export async function getLabels(): Promise<Record<string, string>> {
+export function getLabels(): Promise<Record<string, string>> {
   return invoke("get_labels");
 }
 
-export async function removeLabel(entityType: string, entityId: string): Promise<void> {
+export function removeLabel(entityType: string, entityId: string): Promise<void> {
   return invoke("remove_label", { entityType, entityId });
 }
 
-export async function getNotifications(): Promise<AgentNotification[]> {
+export function getNotifications(): Promise<AgentNotification[]> {
   return invoke("get_notifications");
 }
 
-export async function markNotificationRead(notificationId: string): Promise<void> {
+export function markNotificationRead(notificationId: string): Promise<void> {
   return invoke("mark_notification_read", { notificationId });
 }
 
-export async function saveAppState(projects: Project[]): Promise<void> {
+export function saveAppState(projects: Project[]): Promise<void> {
   return invoke("save_app_state", { projects });
 }
 
-export async function loadAppState(): Promise<Project[]> {
+export function loadAppState(): Promise<Project[]> {
   return invoke("load_app_state");
 }
 
@@ -104,18 +104,18 @@ export interface GhosttyConfig {
   macos_titlebar_style: string;
 }
 
-export async function getGhosttyConfig(): Promise<GhosttyConfig> {
+export function getGhosttyConfig(): Promise<GhosttyConfig> {
   return invoke("get_ghostty_config");
 }
 
-export async function triggerTestNotification(agent: string, message: string): Promise<void> {
+export function triggerTestNotification(agent: string, message: string): Promise<void> {
   return invoke("trigger_test_notification", { agent, message });
 }
 
-export async function ghosttyStatus(): Promise<string> {
+export function ghosttyStatus(): Promise<string> {
   return invoke("ghostty_status");
 }
 
-export async function ghosttyInit(): Promise<string> {
+export function ghosttyInit(): Promise<string> {
   return invoke("ghostty_init");
 }

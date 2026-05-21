@@ -56,3 +56,12 @@ pub async fn list_branches(project_path: String) -> Result<Vec<Branch>, String> 
             .collect())
     }).await.map_err(|e| e.to_string())?
 }
+
+#[tauri::command]
+pub async fn fetch_remote_branches(project_path: String) -> Result<Vec<String>, String> {
+    tokio::task::spawn_blocking(move || {
+        let path = PathBuf::from(&project_path);
+        git::fetch_all(&path)?;
+        git::list_remote_branches(&path)
+    }).await.map_err(|e| e.to_string())?
+}

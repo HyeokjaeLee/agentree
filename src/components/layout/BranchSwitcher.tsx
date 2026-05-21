@@ -1,4 +1,10 @@
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useProjectStore } from "@/stores/useProjectStore";
 
 export function BranchSwitcher() {
@@ -15,10 +21,10 @@ export function BranchSwitcher() {
   const activeWorktree = getActiveWorktree();
   const terminalParent = getActiveTerminalParent();
 
-  if (!activeTerminalId || !activeTerminal || !terminalParent) {
+  if (!(activeTerminalId && activeTerminal && terminalParent)) {
     return (
-      <Select disabled>
-        <SelectTrigger className="h-7 w-40 text-xs bg-transparent border-0">
+      <Select disabled={true}>
+        <SelectTrigger className="h-7 w-40 border-0 bg-transparent text-xs">
           <SelectValue placeholder="No terminal" />
         </SelectTrigger>
         <SelectContent />
@@ -29,8 +35,8 @@ export function BranchSwitcher() {
   const project = getProjectById(activeTerminal.project_id);
   if (!project) {
     return (
-      <Select disabled>
-        <SelectTrigger className="h-7 w-40 text-xs bg-transparent border-0">
+      <Select disabled={true}>
+        <SelectTrigger className="h-7 w-40 border-0 bg-transparent text-xs">
           <SelectValue placeholder="No terminal" />
         </SelectTrigger>
         <SelectContent />
@@ -40,20 +46,18 @@ export function BranchSwitcher() {
 
   const currentBranch = activeWorktree
     ? activeWorktree.branch
-    : project.branches.find((b) => b.id === terminalParent.parentId)?.name ?? "";
+    : (project.branches.find((b) => b.id === terminalParent.parentId)?.name ?? "");
 
   const handleBranchChange = async (newBranch: string) => {
-    if (newBranch === currentBranch) return;
-    await switchBranch(
-      terminalParent.projectId,
-      newBranch,
-      activeWorktree?.path
-    );
+    if (newBranch === currentBranch) {
+      return;
+    }
+    await switchBranch(terminalParent.projectId, newBranch, activeWorktree?.path);
   };
 
   return (
     <Select value={currentBranch} onValueChange={handleBranchChange}>
-      <SelectTrigger className="h-7 w-40 text-xs bg-transparent border-0 hover:bg-accent/50">
+      <SelectTrigger className="w-40 border-0 bg-transparent text-xs hover:bg-accent/50">
         <SelectValue placeholder="Select branch" />
       </SelectTrigger>
       <SelectContent>

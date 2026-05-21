@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-interface UIState {
+interface UiState {
   sidebarOpen: boolean;
   sidebarWidth: number;
   addProjectDialogOpen: boolean;
@@ -18,7 +18,7 @@ interface UIState {
   closeNewWorktreeDialog: () => void;
 }
 
-export const useUIStore = create<UIState>()(
+export const useUIStore = create<UiState>()(
   persist(
     (set) => ({
       sidebarOpen: true,
@@ -31,14 +31,13 @@ export const useUIStore = create<UIState>()(
       toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
       setSidebarWidth: (width) => set({ sidebarWidth: width }),
       setAddProjectDialogOpen: (open) => set({ addProjectDialogOpen: open }),
-      openNewBranchDialog: (projectId) =>
-        set({ newBranchDialogProjectId: projectId }),
+      openNewBranchDialog: (projectId) => set({ newBranchDialogProjectId: projectId }),
       closeNewBranchDialog: () => set({ newBranchDialogProjectId: null }),
       openNewWorktreeDialog: (projectId, branch) =>
         set({ newWorktreeDialogProjectId: projectId, newWorktreeDialogBranch: branch }),
       closeNewWorktreeDialog: () =>
         set({ newWorktreeDialogProjectId: null, newWorktreeDialogBranch: null }),
     }),
-    { name: "ui-store" }
-  )
+    { name: "ui-store" },
+  ),
 );

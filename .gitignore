@@ -2,5 +2,6 @@ node_modules/
 dist/
 target/
 .opencode/
+.sisyphus/
 *.tsbuildinfo
 session-*.md

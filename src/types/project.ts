@@ -4,6 +4,7 @@ export interface Project {
   path: string;
   label?: string;
   branches: Branch[];
+  remote_branches?: string[];
   worktrees: Worktree[];
 }
 
